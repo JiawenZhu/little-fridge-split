@@ -68,7 +68,8 @@ export async function createSplitServer({ root, env = process.env, paypalRequest
           reference_id: person,
           custom_id: `${split.id}|${person}`,
           description: `Your share of ${split.title}`.slice(0, 127),
-          payee: { merchant_id: split.organizer.merchantId },
+          // SPIKE_NO_PAYEE=1 pays the app's own merchant instead, to tell payee problems from account problems.
+          ...(env.SPIKE_NO_PAYEE === "1" ? {} : { payee: { merchant_id: split.organizer.merchantId } }),
           amount: { ...amount, breakdown: { item_total: amount } },
           items: [{ name: `Groceries: ${share.items.length} items`, quantity: "1", unit_amount: amount, category: "PHYSICAL_GOODS" }],
         }],

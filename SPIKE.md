@@ -9,6 +9,19 @@ The plan (VENMO-SPLIT-PLAN.md in the Little Fridge app repo) said to prove four 
 | c | Does the PayPal webhook reach us and mark a share paid? | **Code done, live test pending.** `/webhooks/paypal` verifies the signature with `/v1/notifications/verify-webhook-signature` and marks the share paid on `PAYMENT.CAPTURE.COMPLETED`. Covered by a test with a mocked PayPal. A live test needs a public URL (Render) and a webhook registered on a Little Fridge sandbox app. | `tests/server.test.mjs` |
 | d | Does a Venmo request link open prefilled on iPhone? | **Changed approach.** `venmo.com`'s universal links only cover `/u/*` and a few app paths, not `/?txn=…`. So phones get `venmo://paycharge?txn=pay&recipients=…&amount=…&note=…` and desktops get `https://venmo.com/u/<handle>`. **Pending:** tap it on a real iPhone with Venmo installed. | `venmo.com/.well-known/apple-app-site-association` |
 
+## Result of the live sandbox Venmo test (2026-10-27)
+
+- **Paying another merchant failed at approval.** Order `66257920RP990814L` ($1.00, payee = organizer merchant) was
+  refused in the Venmo popup with "Authorization failed due to insufficient permissions". Nothing was captured.
+- **Paying the app's own merchant worked end to end.** Same buyer, same browser, `SPIKE_NO_PAYEE=1`: order
+  `56C023154K4508040` ($1.00) was approved with Venmo, captured (`1VN97759V85949241`, COMPLETED), the server checked the
+  amount and `custom_id`, and the page shows "Paid with Venmo". The payer came back as PayPal's sandbox placeholder
+  Venmo user, so no real money moved.
+- **What this means for path A:** creating an order for another payee is allowed, but approving it needs the organizer
+  to grant our app permission. That's PayPal's partner onboarding (Partner Referrals / multiparty), which a plain REST
+  app doesn't have. For the hackathon demo the organizer is the app's own sandbox merchant. For real households we need
+  either partner onboarding approval or invoices (path B), plus the free `venmo://` link.
+
 ## Testing Venmo in sandbox safely (researched 2026-10-27)
 
 - PayPal's docs: on desktop, sandbox Venmo uses the **Venmo web login** (no QR code in sandbox). Log in with one of the
