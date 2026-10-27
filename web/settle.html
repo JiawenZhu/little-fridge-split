@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#F7F2E8">
+<title>Settle up · Little Fridge</title>
+<link rel="icon" href="/img/logo.png">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<main class="page" id="page" aria-busy="true">
+  <header class="brand"><img src="/img/logo.png" alt="" width="34" height="34"><span>Little Fridge</span></header>
+
+  <section class="hero">
+    <div class="avatars" id="avatars"></div>
+    <p class="eyebrow" id="who">Loading your share…</p>
+    <h1><span class="currency">$</span><span id="total">0.00</span></h1>
+    <p class="sub" id="sub"></p>
+  </section>
+
+  <section class="receipt" aria-label="Your items">
+    <ul id="items"></ul>
+    <dl class="sums">
+      <div><dt>Items</dt><dd id="subtotal"></dd></div>
+      <div><dt>Tax, split by what you bought</dt><dd id="extras"></dd></div>
+      <div class="grand"><dt>Your share</dt><dd id="grand"></dd></div>
+    </dl>
+  </section>
+
+  <section class="pay" id="pay">
+    <div id="venmo-button" class="paypal-slot"></div>
+    <div id="paypal-button" class="paypal-slot"></div>
+    <a class="free-link" id="venmo-link" hidden>Pay in the Venmo app instead <span>free · you'll mark it paid</span></a>
+    <p class="error" id="error" role="alert" hidden></p>
+    <p class="trust">Your money goes straight to <b id="organizer">the organizer</b>. Little Fridge never holds it.</p>
+  </section>
+
+  <section class="done" id="done" hidden>
+    <svg class="check" viewBox="0 0 52 52" aria-hidden="true"><circle cx="26" cy="26" r="24"/><path d="M15 27l7 7 15-16"/></svg>
+    <h2 id="done-title">Paid</h2>
+    <p id="done-sub"></p>
+  </section>
+</main>
+<script type="module" src="/settle.js"></script>
+</body>
+</html>

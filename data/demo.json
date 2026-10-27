@@ -1,0 +1,26 @@
+{
+  "id": "tj-2026-10-26",
+  "title": "Trader Joe's run",
+  "paidWith": "Apple Pay",
+  "paidAt": "2026-10-26T18:42:00-05:00",
+  "organizer": { "id": "jiawen", "name": "Jiawen", "merchantId": "set ORGANIZER_MERCHANT_ID" },
+  "people": {
+    "jiawen": { "name": "Jiawen", "color": "#5E8B4A" },
+    "sam": { "name": "Sam", "color": "#E08A4F" },
+    "mia": { "name": "Mia", "color": "#C9637A" },
+    "alex": { "name": "Alex", "color": "#4F7FB8" }
+  },
+  "lines": [
+    { "id": "oat-milk", "name": "Oat milk", "price": "4.99", "people": ["jiawen", "sam", "mia", "alex"] },
+    { "id": "salmon", "name": "Atlantic salmon", "price": "14.99", "people": ["jiawen", "sam"] },
+    { "id": "avocados", "name": "Avocados, bag of 4", "price": "5.49", "people": ["mia"] },
+    { "id": "strawberries", "name": "Strawberries", "price": "4.29", "people": ["jiawen", "sam", "mia", "alex"] },
+    { "id": "sourdough", "name": "Sourdough loaf", "price": "5.99", "people": ["sam", "alex"] },
+    { "id": "yogurt", "name": "Greek yogurt", "price": "6.49", "people": ["alex"] },
+    { "id": "coffee", "name": "Coffee beans", "price": "12.99", "people": ["jiawen"] },
+    { "id": "pasta", "name": "Pasta + marinara", "price": "8.98", "people": ["jiawen", "sam", "mia", "alex"] },
+    { "id": "chicken", "name": "Chicken thighs", "price": "11.47", "people": ["mia", "alex"] }
+  ],
+  "extras": "3.41",
+  "demoTokens": { "sam": "demo-sam", "mia": "demo-mia", "alex": "demo-alex" }
+}

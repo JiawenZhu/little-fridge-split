@@ -1,0 +1,91 @@
+/* Little Fridge palette (matches Theme in the iOS app). */
+:root {
+  --bg: #F7F2E8;
+  --card: #FFFEFA;
+  --ink: #2E3830;
+  --muted: #6E756B;
+  --accent: #40684F;
+  --soft: #E0EDDB;
+  --line: #DEDBCF;
+  --danger: #B5483C;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 16px/1.4 -apple-system, BlinkMacSystemFont, "SF Pro Rounded", "Segoe UI", system-ui, sans-serif;
+}
+.page { max-width: 440px; margin: 0 auto; padding: max(18px, env(safe-area-inset-top)) 16px 40px; }
+.page[aria-busy="true"] .receipt, .page[aria-busy="true"] .pay { opacity: 0; }
+
+.brand { display: flex; align-items: center; gap: 10px; font-weight: 700; letter-spacing: -0.01em; }
+.brand img { border-radius: 9px; box-shadow: 0 1px 3px rgb(0 0 0 / .12); }
+
+.hero { text-align: center; padding: 28px 0 22px; }
+.avatars { display: flex; justify-content: center; margin-bottom: 14px; }
+.avatar {
+  width: 38px; height: 38px; border-radius: 50%; margin-left: -8px;
+  display: grid; place-items: center; color: #fff; font-weight: 700; font-size: 15px;
+  border: 3px solid var(--bg); opacity: .55; transition: transform .3s, opacity .3s;
+}
+.avatar:first-child { margin-left: 0; }
+.avatar.you { opacity: 1; transform: scale(1.18); z-index: 1; }
+.eyebrow { margin: 0; color: var(--muted); font-size: 15px; }
+h1 { margin: 4px 0 2px; font-size: 64px; line-height: 1; letter-spacing: -0.04em; font-weight: 800; font-variant-numeric: tabular-nums; }
+h1 .currency { font-size: 34px; vertical-align: 22px; margin-right: 2px; color: var(--muted); font-weight: 700; }
+.sub { margin: 8px auto 0; max-width: 32ch; color: var(--muted); font-size: 14px; }
+
+/* Receipt card with a torn bottom edge. */
+.receipt {
+  background: var(--card); border-radius: 18px 18px 0 0; padding: 8px 18px 20px; position: relative;
+  box-shadow: 0 1px 2px rgb(46 56 48 / .06), 0 10px 30px -18px rgb(46 56 48 / .35);
+  transition: opacity .4s;
+}
+.receipt::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: -10px; height: 10px;
+  background: linear-gradient(-45deg, transparent 6px, var(--card) 0) 0 0 / 14px 10px,
+              linear-gradient(45deg, transparent 6px, var(--card) 0) 0 0 / 14px 10px;
+}
+.receipt ul { list-style: none; margin: 0; padding: 0; }
+.receipt li {
+  display: grid; grid-template-columns: 44px 1fr auto; gap: 12px; align-items: center;
+  padding: 10px 0; border-bottom: 1px dashed var(--line);
+  animation: unroll .45s cubic-bezier(.2, .8, .2, 1) both; animation-delay: calc(var(--i) * 70ms + 120ms);
+}
+.receipt li img { width: 44px; height: 44px; object-fit: contain; }
+.receipt .name { font-weight: 600; }
+.receipt .name small { display: block; font-weight: 500; color: var(--muted); font-size: 13px; }
+.receipt .amount { font-variant-numeric: tabular-nums; font-weight: 600; }
+@keyframes unroll { from { opacity: 0; transform: translateY(-8px); } }
+.sums { margin: 12px 0 0; }
+.sums div { display: flex; justify-content: space-between; padding: 3px 0; color: var(--muted); font-size: 15px; }
+.sums dd { margin: 0; font-variant-numeric: tabular-nums; }
+.sums .grand { color: var(--ink); font-weight: 700; font-size: 18px; padding-top: 10px; }
+
+.pay { margin-top: 34px; display: grid; gap: 10px; transition: opacity .4s; }
+.paypal-slot:empty { display: none; }
+.free-link {
+  display: block; text-align: center; padding: 14px; border-radius: 999px; text-decoration: none;
+  color: var(--accent); font-weight: 600; background: var(--soft);
+}
+.free-link span { display: block; font-size: 12.5px; font-weight: 500; color: var(--muted); }
+.error { margin: 0; padding: 12px 14px; border-radius: 12px; background: #F8E3DF; color: var(--danger); font-size: 14px; }
+.trust { margin: 6px 0 0; text-align: center; color: var(--muted); font-size: 13px; }
+
+.done { text-align: center; padding: 26px 0 0; animation: rise .5s cubic-bezier(.2, .8, .2, 1) both; }
+.done h2 { margin: 12px 0 4px; font-size: 26px; letter-spacing: -0.02em; }
+.done p { margin: 0 auto; max-width: 30ch; color: var(--muted); }
+.check { width: 76px; height: 76px; }
+.check circle { fill: var(--soft); stroke: var(--accent); stroke-width: 2.5; stroke-dasharray: 151; stroke-dashoffset: 151; animation: draw .6s ease-out forwards; }
+.check path { fill: none; stroke: var(--accent); stroke-width: 4; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 40; stroke-dashoffset: 40; animation: draw .35s .5s ease-out forwards; }
+@keyframes draw { to { stroke-dashoffset: 0; } }
+@keyframes rise { from { opacity: 0; transform: translateY(12px); } }
+.is-paid h1 { color: var(--accent); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-delay: 0ms !important; transition: none !important; }
+}
