@@ -9,6 +9,8 @@ import { fromCents, venmoLinks } from "./split.js";
 
 const TYPES = { ".html": "text/html; charset=utf-8", ".js": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml", ".png": "image/png", ".json": "application/json" };
 const fail = (status, message) => Object.assign(new Error(message), { status });
+// Up to four of a share's food emoji, without repeats, e.g. "🍓🥛".
+const foodEmoji = share => [...new Set(share.items.map(i => i.emoji).filter(Boolean))].slice(0, 4).join("");
 
 export async function createSplitServer({ root, env = process.env, paypalRequest = createPayPal(env), log = console.log }) {
   const store = await openStore(join(root, "data/store.json"), join(root, "data/demo.json"));
@@ -110,12 +112,15 @@ export async function createSplitServer({ root, env = process.env, paypalRequest
         purchase_units: [{
           reference_id: person,
           custom_id: `${split.id}|${person}`,
-          description: `Your share of ${split.title}`.slice(0, 127),
+          // Shown on the PayPal / Venmo receipt: the food's emoji make it easy to recognise.
+          description: `${foodEmoji(share)} ${split.title} split with ${split.organizer.name || split.people[split.organizer.id]?.name || "a friend"}`.trim().slice(0, 127),
+          soft_descriptor: "LITTLE FRIDGE",
           // Without a merchant ID the order pays the PayPal account that owns the REST app (option 3: you are the
           // organizer). Paying other organizers needs PayPal partner approval; see SPIKE.md.
           ...(split.organizer.merchantId ? { payee: { merchant_id: split.organizer.merchantId } } : {}),
           amount: { ...amount, breakdown: { item_total: amount } },
-          items: [{ name: `Groceries: ${share.items.length} items`, quantity: "1", unit_amount: amount, category: "PHYSICAL_GOODS" }],
+          items: [{ name: share.items.map(i => `${i.emoji || ""} ${i.name}`.trim()).join(", ").slice(0, 127) || "Groceries",
+                    quantity: "1", unit_amount: amount, category: "PHYSICAL_GOODS" }],
         }],
         // Used when PayPal opens full-screen instead of a popup: it sends the buyer back to the page to finish.
         application_context: {
