@@ -4,7 +4,7 @@ const token = location.pathname.split("/").pop();
 const api = async (path, body) => {
   const res = await fetch(path, { method: body ? "POST" : "GET", headers: body ? { "Content-Type": "application/json" } : {}, body: body ? JSON.stringify(body) : undefined });
   const json = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(json.error || "Something went wrong. Please try again.");
+  if (!res.ok) throw Object.assign(new Error(json.error || "Something went wrong. Please try again."), { code: json.code });
   return json;
 };
 const money = v => "$" + v;
@@ -71,9 +71,15 @@ async function mountButtons(paypal, share) {
     fundingSource,
     style: { layout: "vertical", shape: "pill", height: 50, label: "pay" },
     createOrder: async () => { showError(""); return (await api(`/api/shares/${token}/order`, {})).id; },
-    onApprove: async ({ orderID }) => {
-      const result = await api(`/api/shares/${token}/capture`, { orderId: orderID });
-      showPaid(share, result.via);
+    onApprove: async ({ orderID }, actions) => {
+      try {
+        const result = await api(`/api/shares/${token}/capture`, { orderId: orderID });
+        showPaid(share, result.via);
+      } catch (err) {
+        // PayPal's advice for a decline: reopen checkout so the payer can choose something else.
+        if (err.code === "INSTRUMENT_DECLINED") return actions.restart();
+        showError(err.message);
+      }
     },
     onCancel: () => showError("No problem. Your share is still open whenever you're ready."),
     onError: err => showError(err?.message || "The payment didn't go through. Please try again."),
@@ -87,11 +93,27 @@ async function mountButtons(paypal, share) {
   if (pp.isEligible()) await pp.render("#paypal-button");
 }
 
+// PayPal's full-screen flow comes back as /s/<token>?token=<order id>&PayerID=…; finish the payment here.
+async function finishRedirect(share) {
+  const params = new URLSearchParams(location.search);
+  history.replaceState(null, "", location.pathname);
+  if (params.get("cancelled")) showError("No problem. Your share is still open whenever you're ready.");
+  if (!params.get("token") || share.status === "paid") return false;
+  try {
+    const result = await api(`/api/shares/${token}/capture`, { orderId: params.get("token") });
+    showPaid(share, result.via);
+    return true;
+  } catch (err) {
+    showError(err.message);
+    return false;
+  }
+}
+
 try {
   const share = await api(`/api/shares/${token}`);
   render(share);
   if (share.status === "paid") showPaid(share, share.paidVia);
-  else await mountButtons(await loadPayPal(), share);
+  else if (!(await finishRedirect(share))) await mountButtons(await loadPayPal(), share);
 } catch (err) {
   $("who").textContent = "We couldn't open this link";
   showError(err.message);

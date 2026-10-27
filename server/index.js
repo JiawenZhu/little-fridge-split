@@ -44,6 +44,8 @@ export async function createSplitServer({ root, env = process.env, paypalRequest
     venmo: split.organizer.venmo ? venmoLinks({ handle: split.organizer.venmo, cents: share.total, note: `🧊 ${split.title} (Little Fridge)` }) : null,
   });
 
+  const publicUrl = headers => env.PUBLIC_URL || `${headers["x-forwarded-proto"] || "http"}://${headers.host}`;
+
   const markPaid = (split, person, payment) => {
     const share = split.shares[person];
     if (share.status === "paid") return false;
@@ -58,7 +60,7 @@ export async function createSplitServer({ root, env = process.env, paypalRequest
     "GET /api/shares/:token": async ({ token }) => publicShare(shareFor(token)),
 
     // The server sets the amount, the payee (the organizer) and custom_id; the browser only says which share.
-    "POST /api/shares/:token/order": async ({ token }) => {
+    "POST /api/shares/:token/order": async ({ token }, _, headers) => {
       const { split, person, share } = shareFor(token);
       if (share.status === "paid") throw fail(409, "This share is already paid.");
       const amount = { currency_code: "USD", value: fromCents(share.total) };
@@ -74,7 +76,14 @@ export async function createSplitServer({ root, env = process.env, paypalRequest
           amount: { ...amount, breakdown: { item_total: amount } },
           items: [{ name: `Groceries: ${share.items.length} items`, quantity: "1", unit_amount: amount, category: "PHYSICAL_GOODS" }],
         }],
-        application_context: { brand_name: "Little Fridge", shipping_preference: "NO_SHIPPING", user_action: "PAY_NOW" },
+        // Used when PayPal opens full-screen instead of a popup: it sends the buyer back to the page to finish.
+        application_context: {
+          brand_name: "Little Fridge",
+          shipping_preference: "NO_SHIPPING",
+          user_action: "PAY_NOW",
+          return_url: `${publicUrl(headers)}/s/${token}`,
+          cancel_url: `${publicUrl(headers)}/s/${token}?cancelled=1`,
+        },
       });
       share.orderId = order.id;
       share.status = share.status === "sent" ? "opened" : share.status;
@@ -87,7 +96,16 @@ export async function createSplitServer({ root, env = process.env, paypalRequest
       const { split, person, share } = shareFor(token);
       if (share.status === "paid") return { ok: true, already: true };
       if (!body.orderId || body.orderId !== share.orderId) throw fail(403, "That payment belongs to a different share.");
-      const order = await paypalRequest("POST", `/v2/checkout/orders/${share.orderId}/capture`, {}, { "PayPal-Request-Id": `capture-${share.orderId}` });
+      let order;
+      try {
+        order = await paypalRequest("POST", `/v2/checkout/orders/${share.orderId}/capture`, {}, { "PayPal-Request-Id": `capture-${share.orderId}` });
+      } catch (err) {
+        // A declined card or empty Venmo balance: the friend can pick another way to pay on the same page.
+        if (err.details?.details?.some(d => d.issue === "INSTRUMENT_DECLINED")) {
+          throw Object.assign(fail(402, "That payment method was declined. Please try another card, bank or account."), { code: "INSTRUMENT_DECLINED" });
+        }
+        throw err;
+      }
       const unit = order.purchase_units?.[0];
       const capture = unit?.payments?.captures?.find(c => c.status === "COMPLETED" || c.status === "PENDING");
       if (!capture) throw fail(402, "PayPal didn't complete the payment.");
@@ -176,7 +194,7 @@ export async function createSplitServer({ root, env = process.env, paypalRequest
     } catch (err) {
       const status = err.status && err.status < 600 ? err.status : err.code === "ENOENT" ? 404 : 500;
       if (status >= 500) log(err.details ? JSON.stringify(err.details) : err);
-      send(res, status, { error: status === 404 && err.code === "ENOENT" ? "Not found" : err.message });
+      send(res, status, { error: status === 404 && err.code === "ENOENT" ? "Not found" : err.message, code: err.code === "ENOENT" ? undefined : err.code });
     }
   });
 }

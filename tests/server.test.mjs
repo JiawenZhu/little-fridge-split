@@ -18,6 +18,7 @@ test("orders pay the organizer, use server amounts, and only matching captures m
   const paypalRequest = async (method, path, body) => {
     if (path === "/v2/checkout/orders") { sent = body; const id = "ORDER" + ++n; orders.set(id, body); return { id }; }
     if (path.endsWith("/capture")) {
+      if (tamper?.decline) throw Object.assign(new Error("UNPROCESSABLE_ENTITY"), { status: 422, details: { details: [{ issue: "INSTRUMENT_DECLINED" }] } });
       captures++;
       const unit = orders.get(path.split("/")[4]).purchase_units[0];
       return {
@@ -51,6 +52,11 @@ test("orders pay the organizer, use server amounts, and only matching captures m
 
     assert.equal((await call("/api/shares/demo-mia/capture", { orderId: id })).status, 403, "another share can't capture Sam's order");
     assert.equal((await call("/api/shares/demo-sam/order", {}, { Origin: "https://evil.example" })).status, 403);
+
+    tamper = { decline: true };
+    const declined = await call("/api/shares/demo-sam/capture", { orderId: id });
+    assert.equal(declined.status, 402);
+    assert.equal((await declined.json()).code, "INSTRUMENT_DECLINED");
 
     tamper = { value: "0.01" };
     assert.equal((await call("/api/shares/demo-sam/capture", { orderId: id })).status, 409);
