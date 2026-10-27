@@ -3,7 +3,7 @@
   "title": "Trader Joe's run",
   "paidWith": "Apple Pay",
   "paidAt": "2026-10-26T18:42:00-05:00",
-  "organizer": { "id": "jiawen", "name": "Jiawen", "merchantId": "set ORGANIZER_MERCHANT_ID" },
+  "organizer": { "id": "jiawen", "name": "Jiawen" },
   "people": {
     "jiawen": { "name": "Jiawen", "color": "#5E8B4A" },
     "sam": { "name": "Sam", "color": "#E08A4F" },

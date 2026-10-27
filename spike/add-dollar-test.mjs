@@ -11,7 +11,7 @@ if (!store.data.splits["dollar-test"]) {
     title: "$1 payment test",
     paidWith: "Apple Pay",
     paidAt: new Date().toISOString(),
-    organizer: { id: "jiawen", name: "Jiawen", merchantId: "set ORGANIZER_MERCHANT_ID" },
+    organizer: { id: "jiawen", name: "Jiawen" },
     people: { jiawen: { name: "Jiawen", color: "#5E8B4A" }, tester: { name: "Tester", color: "#E08A4F" } },
     lines: [{ id: "strawberries", name: "Strawberries (test)", price: "1.00", people: ["tester"] }],
     extras: "0",

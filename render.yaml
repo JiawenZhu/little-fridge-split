@@ -17,7 +17,5 @@ services:
         sync: false
       - key: PAYPAL_WEBHOOK_ID
         sync: false
-      - key: ORGANIZER_MERCHANT_ID
-        sync: false
       - key: ORGANIZER_VENMO
         sync: false
