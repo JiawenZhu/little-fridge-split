@@ -4,7 +4,7 @@ import { readFile } from "node:fs/promises";
 import { join, extname, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createPayPal } from "./paypal.js";
-import { openStore } from "./store.js";
+import { openStore, addSplit } from "./store.js";
 import { fromCents, venmoLinks } from "./split.js";
 
 const TYPES = { ".html": "text/html; charset=utf-8", ".js": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml", ".png": "image/png", ".json": "application/json" };
@@ -35,7 +35,7 @@ export async function createSplitServer({ root, env = process.env, paypalRequest
     you: { name: split.people[person].name, color: split.people[person].color },
     people: Object.values(split.people).map(p => ({ name: p.name, color: p.color })),
     receiptTotal: fromCents(split.totalCents),
-    items: share.items.map(i => ({ id: i.id, name: i.name, amount: fromCents(i.cents), sharedWith: i.sharedWith })),
+    items: share.items.map(i => ({ id: i.id, name: i.name, emoji: i.emoji || null, art: i.art || null, amount: fromCents(i.cents), sharedWith: i.sharedWith })),
     subtotal: fromCents(share.subtotal),
     extras: fromCents(share.extras),
     total: fromCents(share.total),
@@ -43,6 +43,38 @@ export async function createSplitServer({ root, env = process.env, paypalRequest
     paidVia: share.paidVia || null,
     venmo: split.organizer.venmo ? venmoLinks({ handle: split.organizer.venmo, cents: share.total, note: `🧊 ${split.title} (Little Fridge)` }) : null,
   });
+
+  const validateSplit = body => {
+    const text = (v, max) => (typeof v === "string" && v.trim() ? v.trim().slice(0, max) : null);
+    const id = text(body.id, 64);
+    if (!id || !/^[A-Za-z0-9_-]+$/.test(id)) throw fail(400, "Missing split id");
+    const people = Object.fromEntries(Object.entries(body.people || {}).slice(0, 12).map(([k, p]) => {
+      if (!/^[A-Za-z0-9_-]{1,40}$/.test(k) || !text(p?.name, 40)) throw fail(400, "Each person needs a name");
+      return [k, { name: text(p.name, 40), color: /^#[0-9A-Fa-f]{6}$/.test(p.color) ? p.color : "#5E8B4A" }];
+    }));
+    const organizerId = text(body.organizer?.id, 40);
+    if (!organizerId || !people[organizerId]) throw fail(400, "The organizer must be one of the people");
+    if (Object.keys(people).length < 2) throw fail(400, "Add at least one friend to split with");
+    const lines = (body.lines || []).slice(0, 60).map(l => {
+      const cents = Math.round(Number(l.price) * 100);
+      if (!text(l.name, 60) || !Number.isFinite(cents) || cents <= 0 || cents > 1_000_000) throw fail(400, "Each item needs a name and a price");
+      const who = [...new Set((l.people || []).filter(p => people[p]))];
+      if (!who.length) throw fail(400, `"${l.name}" has nobody assigned`);
+      return { id: text(l.id, 64) || id, name: text(l.name, 60), price: (cents / 100).toFixed(2), people: who, emoji: text(l.emoji, 8), art: text(l.art, 40) };
+    });
+    if (!lines.length) throw fail(400, "Pick at least one item");
+    const extras = Math.max(0, Math.round(Number(body.extras || 0) * 100)) / 100;
+    return {
+      id,
+      title: text(body.title, 80) || "Groceries",
+      paidWith: text(body.paidWith, 30) || "Apple Pay",
+      paidAt: Number.isNaN(Date.parse(body.paidAt)) ? new Date().toISOString() : body.paidAt,
+      organizer: { id: organizerId, name: people[organizerId].name, venmo: env.ORGANIZER_VENMO || undefined },
+      people,
+      lines,
+      extras: extras.toFixed(2),
+    };
+  };
 
   const publicUrl = headers => env.PUBLIC_URL || `${headers["x-forwarded-proto"] || "http"}://${headers.host}`;
 
@@ -57,7 +89,16 @@ export async function createSplitServer({ root, env = process.env, paypalRequest
   const routes = {
     "GET /api/config": async () => ({ clientId: env.PAYPAL_CLIENT_ID, env: env.PAYPAL_ENV === "live" ? "live" : "sandbox" }),
 
-    "GET /api/shares/:token": async ({ token }) => publicShare(shareFor(token)),
+    // Viewing the link counts as opened, so the organizer sees Sent → Opened → Paid.
+    "GET /api/shares/:token": async ({ token }) => {
+      const found = shareFor(token);
+      if (found.share.status === "sent") {
+        found.share.status = "opened";
+        found.share.openedAt = new Date().toISOString();
+        await store.save();
+      }
+      return publicShare(found);
+    },
 
     // The server sets the amount, the payee (the organizer) and custom_id; the browser only says which share.
     "POST /api/shares/:token/order": async ({ token }, _, headers) => {
@@ -143,17 +184,37 @@ export async function createSplitServer({ root, env = process.env, paypalRequest
       return { ok: true };
     },
 
-    // Organizer view for the spike (the iOS app reads Firestore later).
-    "GET /api/splits/:id": async ({ id }) => {
+    // The iOS app creates a split from fridge items. The server recomputes every share; the app only says who had what.
+    "POST /api/splits": async (_, body, headers) => {
+      if (env.SPLIT_APP_KEY && headers["x-app-key"] !== env.SPLIT_APP_KEY) throw fail(401, "Not allowed");
+      const split = validateSplit(body);
+      if (data.splits[split.id]) throw fail(409, "That split already exists.");
+      const made = addSplit(data, split);
+      await store.save();
+      log(`split created: ${made.id} ${fromCents(made.totalCents)} for ${Object.keys(made.shares).length} people`);
+      return organizerView(made, headers);
+    },
+
+    // Organizer view: totals, statuses and each friend's link.
+    "GET /api/splits/:id": async ({ id }, _, headers) => {
       const split = data.splits[id];
       if (!split) throw fail(404, "No such split");
-      return {
-        title: split.title,
-        total: fromCents(split.totalCents),
-        shares: Object.fromEntries(Object.entries(split.shares).map(([p, s]) => [p, { name: split.people[p].name, total: fromCents(s.total), status: s.status, paidVia: s.paidVia || null, link: `/s/${s.token}` }])),
-      };
+      return organizerView(split, headers);
     },
   };
+
+  const organizerView = (split, headers) => ({
+    id: split.id,
+    title: split.title,
+    total: fromCents(split.totalCents),
+    shares: Object.fromEntries(Object.entries(split.shares).map(([p, s]) => [p, {
+      name: split.people[p].name,
+      total: fromCents(s.total),
+      status: s.status,
+      paidVia: s.paidVia || null,
+      link: `${publicUrl(headers)}/s/${s.token}`,
+    }])),
+  });
 
   const match = (method, path) => {
     for (const [key, handler] of Object.entries(routes)) {

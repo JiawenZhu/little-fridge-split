@@ -56,7 +56,8 @@ h1 .currency { font-size: 34px; vertical-align: 22px; margin-right: 2px; color: 
   padding: 10px 0; border-bottom: 1px dashed var(--line);
   animation: unroll .45s cubic-bezier(.2, .8, .2, 1) both; animation-delay: calc(var(--i) * 70ms + 120ms);
 }
-.receipt li img { width: 44px; height: 44px; object-fit: contain; }
+.receipt .art { width: 44px; height: 44px; display: grid; place-items: center; font-size: 30px; }
+.receipt .art img { width: 44px; height: 44px; object-fit: contain; }
 .receipt .name { font-weight: 600; }
 .receipt .name small { display: block; font-weight: 500; color: var(--muted); font-size: 13px; }
 .receipt .amount { font-variant-numeric: tabular-nums; font-weight: 600; }

@@ -13,7 +13,7 @@ export function splitBill({ people, lines, extrasCents = 0 }) {
     for (const [i, cents] of spread(line.cents, line.people.map(() => 1)).entries()) {
       const person = result[line.people[i]];
       if (!person) throw new Error(`Unknown person ${line.people[i]}`);
-      person.items.push({ id: line.id, name: line.name, cents, sharedWith: line.people.length });
+      person.items.push({ id: line.id, name: line.name, emoji: line.emoji, art: line.art, cents, sharedWith: line.people.length });
       person.subtotal += cents;
     }
   }

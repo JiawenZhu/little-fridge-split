@@ -74,8 +74,28 @@ test("orders pay the organizer, use server amounts, and only matching captures m
     const after = await (await call("/api/splits/tj-2026-10-26")).json();
     assert.equal(after.shares.sam.status, "paid");
     assert.equal(after.shares.mia.status, "paid");
-    assert.equal(after.shares.alex.status, "sent");
+    assert.equal(after.shares.alex.status, "sent", "nobody opened Alex's link yet");
+    await call("/api/shares/demo-alex");
+    assert.equal((await (await call("/api/splits/tj-2026-10-26")).json()).shares.alex.status, "opened");
     assert.equal(JSON.parse(await readFile(join(root, "data/store.json"))).payments.length, 2);
+
+    // The app creates a split; the server works out the shares and hands back one link per friend.
+    const made = await call("/api/splits", {
+      id: "app-split-1", title: "Trader Joe's", paidWith: "Apple Pay",
+      organizer: { id: "me" },
+      people: { me: { name: "Jiawen", color: "#5E8B4A" }, sam: { name: "Sam", color: "#E08A4F" } },
+      lines: [{ id: "a", name: "Milk", price: "4.00", people: ["me", "sam"], emoji: "🥛" }, { id: "b", name: "Steak", price: "9.99", people: ["sam"] }],
+      extras: "1.01",
+    });
+    assert.equal(made.status, 200);
+    const view = await made.json();
+    assert.equal(view.total, "15.00");
+    assert.match(view.shares.sam.link, /\/s\/[A-Za-z0-9_-]{20,}$/);
+    assert.equal(view.shares.me, undefined, "the organizer doesn't pay themselves");
+    const samView = await (await call(new URL(view.shares.sam.link).pathname.replace("/s/", "/api/shares/"))).json();
+    assert.equal(samView.items[0].emoji, "🥛");
+    assert.equal((await call("/api/splits", { id: "app-split-1", organizer: { id: "me" }, people: {}, lines: [] })).status, 400);
+    assert.equal((await call("/api/splits", { id: "bad", organizer: { id: "me" }, people: { me: { name: "J" } }, lines: [{ name: "x", price: "1", people: ["me"] }] })).status, 400, "needs a friend");
   } finally {
     await new Promise(ok => server.close(ok));
     await rm(root, { recursive: true, force: true });

@@ -27,7 +27,15 @@ function render(share) {
   $("items").replaceChildren(...share.items.map((item, i) => {
     const li = document.createElement("li");
     li.style.setProperty("--i", i);
-    li.innerHTML = `<img alt="" src="/img/${item.id}.png" width="44" height="44"><span class="name"></span><span class="amount"></span>`;
+    li.innerHTML = `<span class="art"></span><span class="name"></span><span class="amount"></span>`;
+    // Items from the app carry an emoji; the demo receipt has pictures named after each item.
+    const art = li.querySelector(".art");
+    if (item.emoji && !item.art) art.textContent = item.emoji;
+    else {
+      const img = Object.assign(new Image(44, 44), { alt: "", src: `/img/${item.art || item.id}.png` });
+      img.onerror = () => img.replaceWith(item.emoji || "🛒");
+      art.append(img);
+    }
     li.querySelector(".name").textContent = item.name;
     if (item.sharedWith > 1) li.querySelector(".name").insertAdjacentHTML("beforeend", `<small>split ${item.sharedWith} ways</small>`);
     li.querySelector(".amount").textContent = money(item.amount);
