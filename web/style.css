@@ -69,6 +69,14 @@ h1 .currency { font-size: 34px; vertical-align: 22px; margin-right: 2px; color: 
 
 .pay { margin-top: 34px; display: grid; gap: 10px; transition: opacity .4s; }
 .paypal-slot:empty { display: none; }
+.venmo-app {
+  display: flex; align-items: center; justify-content: center; gap: 7px; height: 50px; border-radius: 999px;
+  background: #008CFF; color: #fff; text-decoration: none; font-size: 18px; font-weight: 500;
+  box-shadow: 0 6px 16px rgba(0, 140, 255, .28); transition: transform .15s ease;
+}
+.venmo-app:active { transform: scale(.97); }
+.venmo-app b { font-size: 24px; font-weight: 800; font-style: italic; letter-spacing: -0.03em; }
+.venmo-note { display: block; text-align: center; margin-top: 6px; font-size: 12.5px; color: var(--muted); }
 .free-link {
   display: block; text-align: center; padding: 14px; border-radius: 999px; text-decoration: none;
   color: var(--accent); font-weight: 600; background: var(--soft);

@@ -45,11 +45,26 @@ function render(share) {
   $("extras").textContent = money(share.extras);
   $("grand").textContent = money(share.total);
   $("organizer").textContent = share.organizer.name;
-  if (share.venmo) {
-    const phone = /iPhone|iPad|Android/i.test(navigator.userAgent);
-    Object.assign($("venmo-link"), { href: phone ? share.venmo.app : share.venmo.web, hidden: false });
-  }
   $("page").removeAttribute("aria-busy");
+}
+
+const phone = /iPhone|iPad|Android/i.test(navigator.userAgent);
+
+// Venmo in the Venmo app, amount and note filled in. When PayPal won't show its Venmo button on this phone
+// (plain http, in-app browsers, private mode…), this becomes the big Venmo button; otherwise it's a small link.
+function showVenmoApp(share, big) {
+  if (!share.venmo) return;
+  const href = phone ? share.venmo.app : share.venmo.web;
+  if (big && phone) {
+    const button = Object.assign(document.createElement("a"), { className: "venmo-app", href });
+    button.append("Pay with ", Object.assign(document.createElement("b"), { textContent: "venmo" }));
+    const note = Object.assign(document.createElement("small"), {
+      className: "venmo-note", textContent: `Opens the Venmo app with ${money(share.total)} filled in · ${share.organizer.name} marks it paid`,
+    });
+    $("venmo-button").replaceChildren(button, note);
+  } else {
+    Object.assign($("venmo-link"), { href, hidden: false });
+  }
 }
 
 function showPaid(share, via) {
@@ -95,8 +110,8 @@ async function mountButtons(paypal, share) {
   const venmo = paypal.Buttons(handlers(paypal.FUNDING.VENMO));
   const eligible = venmo.isEligible();
   window.__venmoEligible = eligible; // read by the spike checks
-  if (eligible) await venmo.render("#venmo-button");
-  else $("venmo-button").remove();
+  if (eligible) { await venmo.render("#venmo-button"); showVenmoApp(share, false); }
+  else showVenmoApp(share, true);
   const pp = paypal.Buttons(handlers(paypal.FUNDING.PAYPAL));
   if (pp.isEligible()) await pp.render("#paypal-button");
 }
@@ -121,7 +136,10 @@ try {
   const share = await api(`/api/shares/${token}`);
   render(share);
   if (share.status === "paid") showPaid(share, share.paidVia);
-  else if (!(await finishRedirect(share))) await mountButtons(await loadPayPal(), share);
+  else if (!(await finishRedirect(share))) {
+    try { await mountButtons(await loadPayPal(), share); }
+    catch (err) { showVenmoApp(share, true); throw err; }
+  }
 } catch (err) {
   $("who").textContent = "We couldn't open this link";
   showError(err.message);

@@ -82,7 +82,7 @@ test("orders pay the organizer, use server amounts, and only matching captures m
     // The app creates a split; the server works out the shares and hands back one link per friend.
     const made = await call("/api/splits", {
       id: "app-split-1", title: "Trader Joe's", paidWith: "Apple Pay",
-      organizer: { id: "me" },
+      organizer: { id: "me", venmo: "@jiawen-zhu" },
       people: { me: { name: "Jiawen", color: "#5E8B4A" }, sam: { name: "Sam", color: "#E08A4F" } },
       lines: [{ id: "a", name: "Milk", price: "4.00", people: ["me", "sam"], emoji: "🥛" }, { id: "b", name: "Steak", price: "9.99", people: ["sam"] }],
       extras: "1.01",
@@ -94,6 +94,11 @@ test("orders pay the organizer, use server amounts, and only matching captures m
     assert.equal(view.shares.me, undefined, "the organizer doesn't pay themselves");
     const samView = await (await call(new URL(view.shares.sam.link).pathname.replace("/s/", "/api/shares/"))).json();
     assert.equal(samView.items[0].emoji, "🥛");
+    assert.match(samView.venmo.app, /recipients=jiawen-zhu&amount=/, "friends can open Venmo to the organizer's own username");
+    const noVenmo = await (await call("/api/splits", { id: "app-split-2", organizer: { id: "me", venmo: "not a handle!" },
+      people: { me: { name: "J" }, sam: { name: "Sam" } }, lines: [{ name: "x", price: "1", people: ["sam"] }] })).json();
+    const noVenmoView = await (await call(new URL(noVenmo.shares.sam.link).pathname.replace("/s/", "/api/shares/"))).json();
+    assert.equal(noVenmoView.venmo, null, "a made-up Venmo username is dropped");
     assert.equal((await call("/api/splits", { id: "app-split-1", organizer: { id: "me" }, people: {}, lines: [] })).status, 400);
     assert.equal((await call("/api/splits", { id: "bad", organizer: { id: "me" }, people: { me: { name: "J" } }, lines: [{ name: "x", price: "1", people: ["me"] }] })).status, 400, "needs a friend");
   } finally {

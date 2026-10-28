@@ -66,12 +66,15 @@ export async function createSplitServer({ root, env = process.env, paypalRequest
     });
     if (!lines.length) throw fail(400, "Pick at least one item");
     const extras = Math.max(0, Math.round(Number(body.extras || 0) * 100)) / 100;
+    // The organizer's own Venmo username, so friends whose phone can't show PayPal's Venmo button can still open Venmo.
+    const handle = String(body.organizer?.venmo || "").trim().replace(/^@/, "");
+    const venmo = /^[A-Za-z0-9_-]{5,30}$/.test(handle) ? handle : env.ORGANIZER_VENMO || undefined;
     return {
       id,
       title: text(body.title, 80) || "Groceries",
       paidWith: text(body.paidWith, 30) || "Apple Pay",
       paidAt: Number.isNaN(Date.parse(body.paidAt)) ? new Date().toISOString() : body.paidAt,
-      organizer: { id: organizerId, name: people[organizerId].name, venmo: env.ORGANIZER_VENMO || undefined },
+      organizer: { id: organizerId, name: people[organizerId].name, venmo },
       people,
       lines,
       extras: extras.toFixed(2),
