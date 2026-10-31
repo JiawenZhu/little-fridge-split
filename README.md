@@ -1,10 +1,10 @@
-# 🧊 Little Fridge Split · 小冰箱分账 💸
+# 🧊 Little Fridge Split 💸
 
 [![Node](https://img.shields.io/badge/Node-22%2B-339933?style=flat&logo=node.js&logoColor=white)](https://nodejs.org)
 [![PayPal](https://img.shields.io/badge/PayPal-Orders%20v2-003087?style=flat&logo=paypal&logoColor=white)](https://developer.paypal.com/docs/api/orders/v2/)
 [![Venmo](https://img.shields.io/badge/Venmo-via%20PayPal%20JS%20SDK-008CFF?style=flat&logo=venmo&logoColor=white)](https://developer.paypal.com/docs/checkout/pay-with-venmo/)
 [![Apple Cash](https://img.shields.io/badge/Apple%20Cash-in%20Messages-000000?style=flat&logo=apple&logoColor=white)](https://support.apple.com/apple-cash)
-[![Tests](https://img.shields.io/badge/Tests-5%20server%20%2B%2073%20app%20passing-success?style=flat&logo=checkmarx)](#-verification--test-results--测试与验证)
+[![Tests](https://img.shields.io/badge/Tests-5%20server%20%2B%2073%20app%20passing-success?style=flat&logo=checkmarx)](#-verification--test-results)
 [![Hackathon](https://img.shields.io/badge/PayPal%20AI%20Hackathon-2026-0070E0?style=flat&logo=devpost&logoColor=white)](https://paypalaihackathon.devpost.com/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
@@ -18,7 +18,7 @@ friend-facing settle-up page; the iOS screens live in the Little Fridge app.
 
 ---
 
-## 📸 Visual Showcase · 界面演示
+## 📸 Visual Showcase
 
 <div align="center">
   <img src="docs/images/banner.png" width="95%" alt="Little Fridge Split: split the bill in the app, friends pay back with Venmo or PayPal" />
@@ -44,9 +44,9 @@ hand; no real money moved.</sub>
 
 ---
 
-## 🌟 Key Features · 核心特色
+## 🌟 Key Features
 
-### 1. 🛒 From the Receipt, Not From Memory (从小票开始，而不是靠记忆)
+### 1. 🛒 From the Receipt, Not From Memory
 - **Apple Pay knows the shop**: a Shortcuts automation logs each Apple Pay grocery tap, and the items land in the fridge
   with their store, date and price.
 - **Find last Saturday's shop fast**: filter the fridge to Apple Pay food, then by **Day · Week · Month**, stepping back
@@ -54,13 +54,13 @@ hand; no real money moved.</sub>
 - **Never split twice**: food that's already split wears a small badge, orange while friends owe, a green check once
   everyone has paid.
 
-### 2. ✂️ Split It Like You'd Explain It (像聊天一样分账)
+### 2. ✂️ Split It Like You'd Explain It
 - **Pick like Photos**: open a pile, tap *Split bill*, and check the items you're sharing. One item skips the picking.
 - **Tap who had what**: everyone sharing an item splits it evenly; "You keep" shows your own share.
 - **Fair to the cent**: shares are computed in integer cents with largest-remainder rounding, and tax is spread in
   proportion to what each person bought, so the shares always add up to the receipt.
 
-### 3. 💸 Getting Paid Back (轻松收款)
+### 3. 💸 Getting Paid Back
 - **Venmo first**: each friend's page has a **Venmo** button and a **PayPal** button from the PayPal JS SDK
   (`enable-funding=venmo`), backed by **PayPal Orders v2**.
 - **A free fallback**: when PayPal can't offer Venmo on a phone, the page shows a big *Pay in the Venmo app* button
@@ -72,7 +72,7 @@ hand; no real money moved.</sub>
   <img src="docs/images/receipt-card.png" width="320" alt="The receipt card attached to a Messages request: Kate's share $3.61" />
 </div>
 
-### 4. 🤝 Settle Up (结清账目)
+### 4. 🤝 Settle Up
 - **A third face on the fridge card**: Fridge → Spending → **Settle up**, with three animated dots.
 - **At a glance**: what you're owed, how much has come back, and each person's balance, biggest first.
 - **Status you can trust**: each share moves *Requested → Opened → Paid*, and a PayPal capture or webhook marks it paid.
@@ -82,7 +82,7 @@ hand; no real money moved.</sub>
 
 ---
 
-## 📐 Technical Architecture · 技术架构
+## 📐 Technical Architecture
 
 ```mermaid
 flowchart LR
@@ -152,7 +152,7 @@ exactly ([`server/split.js`](server/split.js)).
 
 ---
 
-## 🔌 API · 接口
+## 🔌 API
 
 | Method & path | What it does |
 | :--- | :--- |
@@ -169,7 +169,7 @@ Cross-site `POST` requests are refused (the `Origin` must match the host), excep
 
 ---
 
-## 📁 Project Structure · 目录结构
+## 📁 Project Structure
 
 ```
 little-fridge-split/
@@ -209,7 +209,7 @@ The iOS side (`SplitSheet.swift`, `SplitService.swift`, `SettleUpPane.swift`, `M
 
 ---
 
-## 🧪 Verification & Test Results · 测试与验证
+## 🧪 Verification & Test Results
 
 ```bash
 $ npm test
@@ -233,7 +233,7 @@ organizer is the app's own sandbox merchant.
 
 ---
 
-## 🚀 Quick Start & Local Setup · 本地构建与运行
+## 🚀 Quick Start & Local Setup
 
 ### Prerequisites
 - **Node.js** 22 or newer (no `npm install` needed: there are no runtime dependencies)
@@ -271,7 +271,7 @@ Release builds use the deployed server.
 
 ---
 
-## 🗺️ Roadmap · 下一步
+## 🗺️ Roadmap
 
 - [x] Settle-up page with Venmo and PayPal (Orders v2), server-set amounts, webhook-confirmed payments
 - [x] iOS: pick items, tap people, payment links, Messages + Apple Cash, Settle up, nudges
@@ -283,7 +283,7 @@ Release builds use the deployed server.
 
 ---
 
-## 🛡️ Security & Privacy Notice · 安全与私密说明
+## 🛡️ Security & Privacy Notice
 
 - **Zero hardcoded secrets**: PayPal credentials live only in the untracked `.env` and in Render's dashboard.
   `.gitignore` excludes `.env` and the live `data/store.json`.
