@@ -7,6 +7,7 @@ import { createPayPal } from "./paypal.js";
 import { openStore, addSplit } from "./store.js";
 import { fromCents, venmoLinks } from "./split.js";
 import { readActivity } from "./activity.js";
+import { sendInvoice, refund, payout } from "./actions.js";
 
 const TYPES = { ".html": "text/html; charset=utf-8", ".js": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml", ".png": "image/png", ".json": "application/json" };
 const fail = (status, message) => Object.assign(new Error(message), { status });
@@ -14,7 +15,9 @@ const fail = (status, message) => Object.assign(new Error(message), { status });
 const foodEmoji = share => [...new Set(share.items.map(i => i.emoji).filter(Boolean))].slice(0, 4).join("");
 
 // Reading account activity needs an app with Transaction Search turned on; ALT_* keys are used for it when set.
-const reportingEnv = env => env.ALT_CLIENT_ID ? { ...env, PAYPAL_CLIENT_ID: env.ALT_CLIENT_ID, PAYPAL_CLIENT_SECRET: env.ALT_CLIENT_SECRET } : env;
+const reportingEnv = env => env.ALT_CLIENT_ID
+  ? { ...env, PAYPAL_CLIENT_ID: env.ALT_CLIENT_ID, PAYPAL_CLIENT_SECRET: env.ALT_CLIENT_SECRET, PAYPAL_BN_CODE: env.ALT_BN_CODE || "" }
+  : env;
 
 export async function createSplitServer({ root, env = process.env, paypalRequest = createPayPal(env),
   reportingRequest = createPayPal(reportingEnv(env)), log = console.log }) {
@@ -85,6 +88,11 @@ export async function createSplitServer({ root, env = process.env, paypalRequest
       lines,
       extras: extras.toFixed(2),
     };
+  };
+
+  // When SPLIT_APP_KEY is set (always, once deployed), only the app may use the account.
+  const allowApp = headers => {
+    if (env.SPLIT_APP_KEY && headers["x-app-key"] !== env.SPLIT_APP_KEY) throw fail(401, "Not allowed");
   };
 
   const publicUrl = headers => env.PUBLIC_URL || `${headers["x-forwarded-proto"] || "http"}://${headers.host}`;
@@ -211,7 +219,7 @@ export async function createSplitServer({ root, env = process.env, paypalRequest
 
     // Little Wallet's PayPal activity: money in from friends (PayPal or Venmo) and money out, newest first.
     "GET /api/paypal/activity": async ({ query }, _, headers) => {
-      if (env.SPLIT_APP_KEY && headers["x-app-key"] !== env.SPLIT_APP_KEY) throw fail(401, "Not allowed");
+      allowApp(headers);
       const days = Number(query?.days) || 90;
       try {
         return { ...(await readActivity(reportingRequest, { days })), env: env.PAYPAL_ENV === "live" ? "live" : "sandbox" };
@@ -219,6 +227,26 @@ export async function createSplitServer({ root, env = process.env, paypalRequest
         if (err.status === 403) throw fail(503, "Turn on Transaction Search for this app in the PayPal Developer Dashboard.");
         throw err;
       }
+    },
+
+    // Penny's actions. The phone shows each one and asks before sending; these move money in the linked account.
+    "POST /api/paypal/invoices": async (_, body, headers) => {
+      allowApp(headers);
+      const made = await sendInvoice(reportingRequest, body);
+      log(`invoice ${made.number} for ${body.name}: ${made.total} (${made.emailed ? "emailed" : "link"})`);
+      return made;
+    },
+    "POST /api/paypal/refunds": async (_, body, headers) => {
+      allowApp(headers);
+      const made = await refund(reportingRequest, body);
+      log(`refund ${made.id}: ${made.amount} ${made.status}`);
+      return made;
+    },
+    "POST /api/paypal/payouts": async (_, body, headers) => {
+      allowApp(headers);
+      const made = await payout(reportingRequest, body);
+      log(`payout ${made.id}: ${made.count} people ${made.status}`);
+      return made;
     },
 
     // Organizer view: totals, statuses and each friend's link.

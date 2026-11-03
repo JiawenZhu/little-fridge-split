@@ -33,7 +33,9 @@ export function createPayPal(env = process.env) {
     const text = await res.text();
     const json = text ? JSON.parse(text) : {};
     if (!res.ok) {
-      const err = new Error(json.message || `PayPal ${method} ${path} → ${res.status}`);
+      // PayPal's first detail says what was actually wrong ("Payee account is restricted").
+      const detail = json.details?.[0]?.description;
+      const err = new Error(detail || json.message || `PayPal ${method} ${path} → ${res.status}`);
       err.status = res.status;
       err.details = json;
       throw err;
