@@ -37,6 +37,8 @@ export async function sendInvoice(paypal, body) {
       note: text(body.note, 400) || undefined,
       memo: "Sent by Penny in Little Wallet",
       payment_term: { term_type: "DUE_ON_RECEIPT" },
+      // "splitId|person", so a paid invoice marks the right share paid.
+      reference: /^[A-Za-z0-9_-]{1,64}\|[A-Za-z0-9_-]{1,40}$/.test(body.reference || "") ? body.reference : undefined,
     },
     primary_recipients: [{ billing_info: { name: { given_name: given, surname: rest.join(" ") || undefined }, ...(email ? { email_address: email } : {}) } }],
     items,

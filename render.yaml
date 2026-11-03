@@ -17,5 +17,19 @@ services:
         sync: false
       - key: PAYPAL_WEBHOOK_ID
         sync: false
+      - key: PAYPAL_BN_CODE
+        sync: false
+      # The second PayPal app: reads activity and sends Penny's invoices, refunds and payouts.
+      - key: ALT_CLIENT_ID
+        sync: false
+      - key: ALT_CLIENT_SECRET
+        sync: false
+      - key: ALT_BN_CODE
+        sync: false
+      - key: ALT_WEBHOOK_ID
+        sync: false
+      # Shared with the Little Wallet app; without it anyone could use the PayPal account.
+      - key: SPLIT_APP_KEY
+        sync: false
       - key: ORGANIZER_VENMO
         sync: false

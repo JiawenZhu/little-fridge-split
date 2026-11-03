@@ -8,6 +8,7 @@ import { openStore, addSplit } from "./store.js";
 import { fromCents, venmoLinks } from "./split.js";
 import { readActivity } from "./activity.js";
 import { sendInvoice, refund, payout } from "./actions.js";
+import { createEvents } from "./events.js";
 
 const TYPES = { ".html": "text/html; charset=utf-8", ".js": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml", ".png": "image/png", ".json": "application/json" };
 const fail = (status, message) => Object.assign(new Error(message), { status });
@@ -20,7 +21,7 @@ const reportingEnv = env => env.ALT_CLIENT_ID
   : env;
 
 export async function createSplitServer({ root, env = process.env, paypalRequest = createPayPal(env),
-  reportingRequest = createPayPal(reportingEnv(env)), log = console.log }) {
+  reportingRequest = createPayPal(reportingEnv(env)), log = console.log, events = createEvents() }) {
   const store = await openStore(join(root, "data/store.json"), join(root, "data/demo.json"));
   const { data } = store;
   // The demo organizer's Venmo handle and PayPal merchant come from the environment, not the public repo.
@@ -102,6 +103,7 @@ export async function createSplitServer({ root, env = process.env, paypalRequest
     if (share.status === "paid") return false;
     Object.assign(share, { status: "paid", paidAt: new Date().toISOString(), captureId: payment.id, paidVia: payment.via });
     data.payments.push({ at: share.paidAt, split: split.id, person, captureId: payment.id, amount: payment.amount, via: payment.via, source: payment.source });
+    events.send("share.paid", { split: split.id, person, name: split.people[person]?.name, title: split.title, amount: payment.amount, via: payment.via });
     return true;
   };
 
@@ -181,27 +183,45 @@ export async function createSplitServer({ root, env = process.env, paypalRequest
     },
 
     // PayPal tells us about payments even if the friend closes the page before capture returns.
+    // PayPal tells us about payments even if the friend closes the page, and when an invoice Penny sent is paid.
+    // Each PayPal app has its own webhook, so the event is checked against whichever one it came from.
     "POST /webhooks/paypal": async (_, event, headers) => {
-      if (!env.PAYPAL_WEBHOOK_ID) throw fail(503, "Webhook not configured");
-      const check = await paypalRequest("POST", "/v1/notifications/verify-webhook-signature", {
-        auth_algo: headers["paypal-auth-algo"],
-        cert_url: headers["paypal-cert-url"],
-        transmission_id: headers["paypal-transmission-id"],
-        transmission_sig: headers["paypal-transmission-sig"],
-        transmission_time: headers["paypal-transmission-time"],
-        webhook_id: env.PAYPAL_WEBHOOK_ID,
-        webhook_event: event,
-      });
-      log(`webhook ${event.event_type} ${event.resource?.id} → ${check.verification_status}`);
-      if (check.verification_status !== "SUCCESS") throw fail(400, "Bad signature");
-      data.webhooks = [...(data.webhooks || []).slice(-49), { at: new Date().toISOString(), type: event.event_type, resource: event.resource?.id, custom_id: event.resource?.custom_id }];
+      const hooks = [[paypalRequest, env.PAYPAL_WEBHOOK_ID], [reportingRequest, env.ALT_WEBHOOK_ID]].filter(([, id]) => id);
+      if (!hooks.length) throw fail(503, "Webhook not configured");
+      let verified = false;
+      for (const [request, webhookId] of hooks) {
+        const check = await request("POST", "/v1/notifications/verify-webhook-signature", {
+          auth_algo: headers["paypal-auth-algo"],
+          cert_url: headers["paypal-cert-url"],
+          transmission_id: headers["paypal-transmission-id"],
+          transmission_sig: headers["paypal-transmission-sig"],
+          transmission_time: headers["paypal-transmission-time"],
+          webhook_id: webhookId,
+          webhook_event: event,
+        }).catch(() => ({}));
+        if (check.verification_status === "SUCCESS") { verified = true; break; }
+      }
+      log(`webhook ${event.event_type} ${event.resource?.id} → ${verified ? "SUCCESS" : "FAILURE"}`);
+      if (!verified) throw fail(400, "Bad signature");
+      const resource = event.resource || {};
+      data.webhooks = [...(data.webhooks || []).slice(-49), { at: new Date().toISOString(), type: event.event_type, resource: resource.id, custom_id: resource.custom_id }];
       if (event.event_type === "PAYMENT.CAPTURE.COMPLETED") {
-        const [sid, person] = String(event.resource.custom_id || "").split("|");
+        const [sid, person] = String(resource.custom_id || "").split("|");
         const split = data.splits[sid];
-        if (split?.shares[person] && event.resource.amount?.value === fromCents(split.shares[person].total)) {
-          markPaid(split, person, { id: event.resource.id, amount: event.resource.amount.value, via: split.shares[person].paidVia || "PayPal", source: "webhook" });
+        if (split?.shares[person] && resource.amount?.value === fromCents(split.shares[person].total)) {
+          markPaid(split, person, { id: resource.id, amount: resource.amount.value, via: split.shares[person].paidVia || "PayPal", source: "webhook" });
         }
       }
+      if (event.event_type === "INVOICING.INVOICE.PAID") {
+        // Penny's invoices carry "splitId|person", so the phone knows whose share it was.
+        const [sid, person] = String(resource.detail?.reference || "").split("|");
+        const amount = resource.payments?.paid_amount?.value || resource.amount?.value || null;
+        const split = data.splits[sid];
+        if (split?.shares[person]) markPaid(split, person, { id: resource.id, amount, via: "PayPal invoice", source: "webhook" });
+        else if (sid && person) events.send("share.paid", { split: sid, person, amount, via: "PayPal invoice", invoice: resource.id });
+      }
+      // Anything that moved money: the phone refreshes its PayPal activity.
+      events.send("activity", { type: event.event_type });
       await store.save();
       return { ok: true };
     },
@@ -247,6 +267,16 @@ export async function createSplitServer({ root, env = process.env, paypalRequest
       const made = await payout(reportingRequest, body);
       log(`payout ${made.id}: ${made.count} people ${made.status}`);
       return made;
+    },
+
+    // Sandbox only: act out a friend paying, for demos and checks without a buyer account.
+    "POST /api/demo/paid": async (_, body, headers) => {
+      if (env.PAYPAL_ENV === "live" || !env.SPLIT_APP_KEY) throw fail(404, "Not found");
+      allowApp(headers);
+      const split = String(body.split || ""), person = String(body.person || "");
+      if (!/^[A-Za-z0-9_-]{1,64}$/.test(split) || !/^[A-Za-z0-9_-]{1,40}$/.test(person)) throw fail(400, "Which share?");
+      events.send("share.paid", { split, person, amount: body.amount ? String(body.amount) : undefined, via: String(body.via || "Venmo").slice(0, 20) });
+      return { ok: true, listening: events.count };
     },
 
     // Organizer view: totals, statuses and each friend's link.
@@ -298,6 +328,12 @@ export async function createSplitServer({ root, env = process.env, paypalRequest
     const url = new URL(req.url, "http://local");
     try {
       if (req.method === "POST" && req.headers.origin && !url.pathname.startsWith("/webhooks/") && new URL(req.headers.origin).host !== req.headers.host) throw fail(403, "Cross-site request");
+      if (req.method === "GET" && url.pathname === "/api/events") {
+        allowApp(req.headers);
+        events.attach(req, res);
+        log(`phone listening (${events.count} open)`);
+        return;
+      }
       const hit = match(req.method, url.pathname);
       if (hit) return send(res, 200, await hit[0]({ ...hit[1], query: Object.fromEntries(url.searchParams) }, req.method === "POST" ? await readBody(req) : {}, req.headers));
       if (req.method !== "GET") throw fail(404, "Not found");
