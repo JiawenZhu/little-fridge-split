@@ -6,13 +6,18 @@ import { fileURLToPath } from "node:url";
 import { createPayPal } from "./paypal.js";
 import { openStore, addSplit } from "./store.js";
 import { fromCents, venmoLinks } from "./split.js";
+import { readActivity } from "./activity.js";
 
 const TYPES = { ".html": "text/html; charset=utf-8", ".js": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml", ".png": "image/png", ".json": "application/json" };
 const fail = (status, message) => Object.assign(new Error(message), { status });
 // Up to four of a share's food emoji, without repeats, e.g. "🍓🥛".
 const foodEmoji = share => [...new Set(share.items.map(i => i.emoji).filter(Boolean))].slice(0, 4).join("");
 
-export async function createSplitServer({ root, env = process.env, paypalRequest = createPayPal(env), log = console.log }) {
+// Reading account activity needs an app with Transaction Search turned on; ALT_* keys are used for it when set.
+const reportingEnv = env => env.ALT_CLIENT_ID ? { ...env, PAYPAL_CLIENT_ID: env.ALT_CLIENT_ID, PAYPAL_CLIENT_SECRET: env.ALT_CLIENT_SECRET } : env;
+
+export async function createSplitServer({ root, env = process.env, paypalRequest = createPayPal(env),
+  reportingRequest = createPayPal(reportingEnv(env)), log = console.log }) {
   const store = await openStore(join(root, "data/store.json"), join(root, "data/demo.json"));
   const { data } = store;
   // The demo organizer's Venmo handle and PayPal merchant come from the environment, not the public repo.
@@ -59,7 +64,8 @@ export async function createSplitServer({ root, env = process.env, paypalRequest
     if (Object.keys(people).length < 2) throw fail(400, "Add at least one friend to split with");
     const lines = (body.lines || []).slice(0, 60).map(l => {
       const cents = Math.round(Number(l.price) * 100);
-      if (!text(l.name, 60) || !Number.isFinite(cents) || cents <= 0 || cents > 1_000_000) throw fail(400, "Each item needs a name and a price");
+      if (!text(l.name, 60) || !Number.isFinite(cents) || cents <= 0) throw fail(400, "Each item needs a name and a price");
+      if (cents > 1_000_000) throw fail(400, "PayPal and Venmo take up to $10,000 per item");
       const who = [...new Set((l.people || []).filter(p => people[p]))];
       if (!who.length) throw fail(400, `"${l.name}" has nobody assigned`);
       return { id: text(l.id, 64) || id, name: text(l.name, 60), price: (cents / 100).toFixed(2), people: who, emoji: text(l.emoji, 8), art: text(l.art, 40) };
@@ -203,6 +209,18 @@ export async function createSplitServer({ root, env = process.env, paypalRequest
       return organizerView(made, headers);
     },
 
+    // Little Wallet's PayPal activity: money in from friends (PayPal or Venmo) and money out, newest first.
+    "GET /api/paypal/activity": async ({ query }, _, headers) => {
+      if (env.SPLIT_APP_KEY && headers["x-app-key"] !== env.SPLIT_APP_KEY) throw fail(401, "Not allowed");
+      const days = Number(query?.days) || 90;
+      try {
+        return { ...(await readActivity(reportingRequest, { days })), env: env.PAYPAL_ENV === "live" ? "live" : "sandbox" };
+      } catch (err) {
+        if (err.status === 403) throw fail(503, "Turn on Transaction Search for this app in the PayPal Developer Dashboard.");
+        throw err;
+      }
+    },
+
     // Organizer view: totals, statuses and each friend's link.
     "GET /api/splits/:id": async ({ id }, _, headers) => {
       const split = data.splits[id];
@@ -253,7 +271,7 @@ export async function createSplitServer({ root, env = process.env, paypalRequest
     try {
       if (req.method === "POST" && req.headers.origin && !url.pathname.startsWith("/webhooks/") && new URL(req.headers.origin).host !== req.headers.host) throw fail(403, "Cross-site request");
       const hit = match(req.method, url.pathname);
-      if (hit) return send(res, 200, await hit[0](hit[1], req.method === "POST" ? await readBody(req) : {}, req.headers));
+      if (hit) return send(res, 200, await hit[0]({ ...hit[1], query: Object.fromEntries(url.searchParams) }, req.method === "POST" ? await readBody(req) : {}, req.headers));
       if (req.method !== "GET") throw fail(404, "Not found");
       if (url.pathname === "/") return send(res, 200, await readFile(join(web, "index.html")), TYPES[".html"]);
       if (/^\/s\/[A-Za-z0-9_-]+$/.test(url.pathname)) return send(res, 200, await readFile(join(web, "settle.html")), TYPES[".html"]);
