@@ -11,6 +11,12 @@ import { sendInvoice, refund, payout } from "./actions.js";
 import { createEvents } from "./events.js";
 
 const TYPES = { ".html": "text/html; charset=utf-8", ".js": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml", ".png": "image/png", ".json": "application/json" };
+// Two apps share this server. A split carries which one made it; splits with no app are Little Fridge's.
+const APPS = {
+  fridge: { name: "Little Fridge", logo: "/img/logo.png", emoji: "🧊" },
+  wallet: { name: "Little Wallet", logo: "/img/wallet.png", emoji: "👛" },
+};
+const appOf = split => APPS[split.app] ?? APPS.fridge;
 const fail = (status, message) => Object.assign(new Error(message), { status });
 // Up to four of a share's food emoji, without repeats, e.g. "🍓🥛".
 const foodEmoji = share => [...new Set(share.items.map(i => i.emoji).filter(Boolean))].slice(0, 4).join("");
@@ -39,6 +45,7 @@ export async function createSplitServer({ root, env = process.env, paypalRequest
 
   // What the friend's page may see: only their own share, never anyone else's items or PayPal IDs.
   const publicShare = ({ split, person, share }) => ({
+    app: { name: appOf(split).name, logo: appOf(split).logo },
     title: split.title,
     paidWith: split.paidWith,
     paidAt: split.paidAt,
@@ -52,7 +59,7 @@ export async function createSplitServer({ root, env = process.env, paypalRequest
     total: fromCents(share.total),
     status: share.status,
     paidVia: share.paidVia || null,
-    venmo: split.organizer.venmo ? venmoLinks({ handle: split.organizer.venmo, cents: share.total, note: `🧊 ${split.title} (Little Fridge)` }) : null,
+    venmo: split.organizer.venmo ? venmoLinks({ handle: split.organizer.venmo, cents: share.total, note: `${appOf(split).emoji} ${split.title} (${appOf(split).name})` }) : null,
   });
 
   const validateSplit = body => {
@@ -81,6 +88,7 @@ export async function createSplitServer({ root, env = process.env, paypalRequest
     const venmo = /^[A-Za-z0-9_-]{5,30}$/.test(handle) ? handle : env.ORGANIZER_VENMO || undefined;
     return {
       id,
+      ...(body.app === "wallet" ? { app: "wallet" } : {}),
       title: text(body.title, 80) || "Groceries",
       paidWith: text(body.paidWith, 30) || "Apple Pay",
       paidAt: Number.isNaN(Date.parse(body.paidAt)) ? new Date().toISOString() : body.paidAt,
@@ -143,7 +151,7 @@ export async function createSplitServer({ root, env = process.env, paypalRequest
         }],
         // Used when PayPal opens full-screen instead of a popup: it sends the buyer back to the page to finish.
         application_context: {
-          brand_name: "Little Fridge",
+          brand_name: appOf(split).name,
           shipping_preference: "NO_SHIPPING",
           user_action: "PAY_NOW",
           return_url: `${publicUrl(headers)}/s/${token}`,

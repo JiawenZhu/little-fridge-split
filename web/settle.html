@@ -4,13 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#F7F2E8">
-<title>Settle up · Little Fridge</title>
-<link rel="icon" href="/img/logo.png">
+<title>Settle up</title>
+<link rel="icon" id="icon" href="data:,">
 <link rel="stylesheet" href="/style.css">
 </head>
 <body>
 <main class="page" id="page" aria-busy="true">
-  <header class="brand"><img src="/img/logo.png" alt="" width="34" height="34"><span>Little Fridge</span></header>
+  <header class="brand"><img id="app-logo" alt="" width="34" height="34" hidden><span id="app-name"></span></header>
 
   <section class="hero">
     <div class="avatars" id="avatars"></div>
@@ -33,7 +33,7 @@
     <div id="paypal-button" class="paypal-slot"></div>
     <a class="free-link" id="venmo-link" hidden>Pay in the Venmo app instead <span>free · you'll mark it paid</span></a>
     <p class="error" id="error" role="alert" hidden></p>
-    <p class="trust">Your money goes straight to <b id="organizer">the organizer</b>. Little Fridge never holds it.</p>
+    <p class="trust">Your money goes straight to <b id="organizer">the organizer</b>. <span id="app-holds"></span> never holds it.</p>
   </section>
 
   <section class="done" id="done" hidden>

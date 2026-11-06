@@ -11,7 +11,10 @@ const money = v => "$" + v;
 const showError = msg => { $("error").textContent = msg; $("error").hidden = !msg; };
 
 function render(share) {
-  document.title = `Settle up with ${share.organizer.name} · Little Fridge`;
+  document.title = `Settle up with ${share.organizer.name} · ${share.app.name}`;
+  $("app-name").textContent = $("app-holds").textContent = share.app.name;
+  $("app-logo").src = $("icon").href = share.app.logo;
+  $("app-logo").hidden = false;
   $("avatars").replaceChildren(...share.people.map(p => {
     const el = document.createElement("span");
     el.className = "avatar" + (p.name === share.you.name ? " you" : "");
@@ -71,7 +74,7 @@ function showPaid(share, via) {
   $("pay").hidden = true;
   $("done").hidden = false;
   $("done-title").textContent = `Paid${via ? " with " + via : ""}`;
-  $("done-sub").textContent = `${share.organizer.name} will see it in Little Fridge right away. Thanks for settling up!`;
+  $("done-sub").textContent = `${share.organizer.name} will see it in ${share.app.name} right away. Thanks for settling up!`;
   $("page").classList.add("is-paid");
 }
 
