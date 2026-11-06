@@ -14,7 +14,7 @@ test("a friend's Venmo payment for a split comes in with its split, items and fe
     cart_info: { item_details: [{ item_name: "Groceries: 5 items", item_quantity: "1", item_amount: { value: "15.74" } }] },
   });
   assert.deepEqual(a, {
-    id: "T000615.74", date: "2026-10-27T05:58:40Z", kind: "received", amount: "15.74", fee: "1.04", currency: "USD", via: "Venmo",
+    id: "T000615.74", date: "2026-10-27T05:58:40Z", kind: "received", amount: "15.74", direction: "in", fee: "1.04", currency: "USD", via: "Venmo",
     name: "Sam Lee", note: "Your share of Trader Joe's run", items: [{ name: "Groceries: 5 items", quantity: 1, amount: "15.74" }],
     split: { id: "tj-2026-10-26", person: "sam" }, pending: false,
   });
@@ -25,6 +25,8 @@ test("payments out are spending; holds, adjustments and denied payments are left
   assert.equal(toActivity(row("T0001", "-42.10")).amount, "42.10");
   assert.equal(toActivity(row("T0400", "-15.18")).kind, "transfer");
   assert.equal(toActivity(row("T1107", "-5.00")).kind, "refund");
+  assert.equal(toActivity(row("T1107", "-5.00")).direction, "out", "a refund you give is money out");
+  assert.equal(toActivity(row("T1105", "1.25")).direction, "in", "a refund to you is money in");
   assert.equal(toActivity(row("T2002", "-14.70")), null);
   assert.equal(toActivity(row("T1900", "5000.00")), null);
   assert.equal(toActivity(row("T0006", "9.00", { transaction_status: "D" })), null);

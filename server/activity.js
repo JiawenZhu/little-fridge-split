@@ -31,6 +31,8 @@ export function toActivity(row) {
     date: info.transaction_initiation_date,
     kind,
     amount: fromCents(cents),
+    // Which way the money went: a refund you give is "out", one that comes back to you is "in".
+    direction: cents >= 0 ? "in" : "out",
     fee: fromCents(toCents(info.fee_amount?.value)),
     currency: info.transaction_amount?.currency_code || "USD",
     via: venmo ? "Venmo" : info.instrument_type === "Credit card" ? "Card" : "PayPal",
