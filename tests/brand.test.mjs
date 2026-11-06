@@ -38,3 +38,27 @@ test("the pay page and PayPal show the app that made the split", async () => {
     server.close();
   }
 });
+
+test("splits survive a restart in DATA_DIR", async () => {
+  const root = await mkdtemp(join(tmpdir(), "lf-root-")), disk = join(await mkdtemp(join(tmpdir(), "lf-disk-")), "var", "data");
+  await mkdir(join(root, "data"));
+  await copyFile(join(repo, "data/demo.json"), join(root, "data/demo.json"));
+  const start = async () => {
+    const server = await createSplitServer({ root, paypalRequest: async () => ({}), env: { DATA_DIR: disk }, log: () => {} });
+    await new Promise(ok => server.listen(0, "127.0.0.1", ok));
+    return [server, "http://127.0.0.1:" + server.address().port];
+  };
+  let [server, base] = await start();
+  const made = await (await fetch(base + "/api/splits", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
+    id: "skeep", app: "wallet", title: "Dinner", organizer: { id: "me" }, people: { me: { name: "Jamie" }, sam: { name: "Sam" } }, lines: [{ name: "Noodles", price: "10.00", people: ["sam"] }] }) })).json();
+  const token = new URL(made.shares.sam.link).pathname.split("/").pop();
+  server.closeAllConnections?.(); await new Promise(ok => server.close(ok));
+  [server, base] = await start();
+  try {
+    const page = await (await fetch(`${base}/api/shares/${token}`)).json();
+    assert.equal(page.total, "10.00");
+    assert.equal(page.app.name, "Little Wallet");
+  } finally {
+    server.closeAllConnections?.(); server.close();
+  }
+});

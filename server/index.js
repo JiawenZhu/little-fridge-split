@@ -1,6 +1,6 @@
 // Little Fridge Split backend: settle-up pages and PayPal/Venmo payments that go straight to the organizer.
 import { createServer } from "node:http";
-import { readFile } from "node:fs/promises";
+import { readFile, mkdir } from "node:fs/promises";
 import { join, extname, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createPayPal } from "./paypal.js";
@@ -28,7 +28,10 @@ const reportingEnv = env => env.ALT_CLIENT_ID
 
 export async function createSplitServer({ root, env = process.env, paypalRequest = createPayPal(env),
   reportingRequest = createPayPal(reportingEnv(env)), log = console.log, events = createEvents() }) {
-  const store = await openStore(join(root, "data/store.json"), join(root, "data/demo.json"));
+  // On Render, DATA_DIR is a disk that survives deploys, so friends' links keep working.
+  const dataDir = env.DATA_DIR || join(root, "data");
+  await mkdir(dataDir, { recursive: true });
+  const store = await openStore(join(dataDir, "store.json"), join(root, "data/demo.json"));
   const { data } = store;
   // The demo organizer's Venmo handle and PayPal merchant come from the environment, not the public repo.
   for (const split of Object.values(data.splits)) {

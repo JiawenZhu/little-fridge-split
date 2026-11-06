@@ -2,15 +2,22 @@ services:
   - type: web
     name: little-fridge-split
     runtime: node
-    plan: free
+    # A paid plan: free services can't keep a disk, and friends' links live on it.
+    plan: starter
     buildCommand: npm install --omit=dev
     startCommand: npm start
     healthCheckPath: /api/config
+    disk:
+      name: split-data
+      mountPath: /var/data
+      sizeGB: 1
     envVars:
       - key: NODE_VERSION
         value: "22"
       - key: PAYPAL_ENV
         value: sandbox
+      - key: DATA_DIR
+        value: /var/data
       - key: PAYPAL_CLIENT_ID
         sync: false
       - key: PAYPAL_CLIENT_SECRET
@@ -32,4 +39,6 @@ services:
       - key: SPLIT_APP_KEY
         sync: false
       - key: ORGANIZER_VENMO
+        sync: false
+      - key: ORGANIZER_MERCHANT_ID
         sync: false
